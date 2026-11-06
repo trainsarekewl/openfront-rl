@@ -1,0 +1,9 @@
+{
+  "name": "openfront-rl-bridge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "link": "node scripts/link.mjs",
+    "bench": "node ../openfront/node_modules/tsx/dist/cli.mjs src/bench.ts"
+  }
+}

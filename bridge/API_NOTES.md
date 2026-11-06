@@ -36,7 +36,7 @@ Every intent is stamped with `clientID`. Unknown clientIDs become a NoOp with a 
 | type | fields | RL use |
 |---|---|---|
 | `spawn` | `tile` | initial spawn (`fromIntent` only works in the spawn phase) |
-| `attack` | `targetID: number\|null`, `troops: number\|null` | null target = attack unowned land. **Troop count is absolute, not a ratio** |
+| `attack` | `targetID: string\|null`, `troops: number\|null` | null target = attack unowned land. **Troop count is absolute, not a ratio** |
 | `boat` | `dst` tile, `troops` | transport ship |
 | `build_unit` | `unit: UnitType`, `tile` | City, Port, Factory, DefensePost, SAMLauncher, MissileSilo, Warship, nukes |
 | `upgrade_structure` | `unit`, `unitId`, `amount?` | |
@@ -46,7 +46,7 @@ Every intent is stamped with `clientID`. Unknown clientIDs become a NoOp with a 
 | `targetPlayer`, `embargo`, `embargo_all`, `emoji`, `quick_chat`, `move_warship`, `delete_unit` | | skip in v1 |
 | `kick_player`, `toggle_pause`, `mark_disconnected`, `update_game_config` | | never send |
 
-Player references (`targetID`, `recipient`) are small IDs (`player.smallID()`), not string ids.
+Player references (`targetID`, `recipient`, `requestor`) are string `player.id()` values (MappedID, /^[A-Za-z0-9]{8,10}$/), not small IDs. The agent's clientID and id must match that regex too.
 
 ## Plan corrections this implies
 - There is **no troop-ratio intent**. The plan's `setTroopRatio` becomes a parameter bucket on
@@ -78,9 +78,9 @@ Player references (`targetID`, `recipient`) are small IDs (`player.smallID()`), 
 which is separate from the production map loader. Production maps (`resources/maps/*`, e.g. `alps`,
 `achiran`, `aegean`) are loaded through `NodeGameMapLoader`.
 
-## Open questions for step 3
-1. Does `EngineConfig` need a non-null clientID for the `Executor` (third constructor arg), or is
-   `undefined` fine with a Human player present?
-2. How does the Human player spawn: via the `spawn` intent (needs a valid land tile), or does
-   `isRandomSpawn` cover it? Check `PlayerSpawner` and `SpawnExecution.queuedDuringSpawnPhase`.
-3. Confirm how a Human player is treated by tribes/nations (targeting, alliances).
+## Answers from step 3 (bench.ts)
+1. `Executor` takes the agent's clientID (or undefined); both work. Intents from unknown clientIDs become NoOps.
+2. The Human spawns via a `spawn` intent issued during the spawn phase (`fromIntent` gate in `SpawnExecution`). The tile can be taken by a tribe's spawn, so retry a new random free land tile every few turns until `hasSpawned()`. Spawn phase is 202 turns.
+3. Accepting an alliance = sending `allianceRequest` to a player that already has a pending request to you (`AllianceRequestExecution.init` calls `incoming.accept()`). Confirmed.
+4. Tribes (bots) do attack the Human; a random policy is often eliminated. `Player.isAlive()` is false after elimination; `game.getWinner()` is non-null at game end (checked by `WinCheckExecution` every 10 ticks).
+5. Measured with bench.ts, alps map, 10 bots, interval 10: 1100-1300 ticks/s, i.e. r of about 110-130 decisions/s/core before real obs/mask cost.

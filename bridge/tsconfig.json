@@ -1,0 +1,10 @@
+{
+  "extends": "../openfront/tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "resources/*": ["../openfront/resources/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}
