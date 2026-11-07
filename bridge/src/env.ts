@@ -40,7 +40,13 @@ import { loadMapFiles } from "@openfront/shared/GameMapLoader";
 import path from "path";
 import { fileURLToPath } from "url";
 import { NodeGameMapLoader } from "../../openfront/tests/perf/fullgame/NodeGameMapLoader";
-import { Action, decodeAction, MAX_NEIGHBORS } from "./actions";
+import {
+  Action,
+  decodeAction,
+  MAX_NEIGHBORS,
+  reachableWaterComponents,
+  ShoreIndex,
+} from "./actions";
 import {
   DEFAULT_REWARD,
   RewardCoefs,
@@ -88,6 +94,10 @@ export interface StepInfo {
   tileShare: number;
   agentAlive: boolean;
   playersAlive: number;
+  /** number of living players the agent is currently allied with */
+  alliesCount: number;
+  /** true while the agent is marked a traitor (broke an alliance recently) */
+  traitor: boolean;
   /** engine state hash at the last tick of this step (determinism checks) */
   hash: string | null;
 }
@@ -127,6 +137,9 @@ export class OpenFrontEnv {
   private done = false;
   private _neighbors: Player[] = [];
   private scratch: TileRef[] = [0, 0, 0, 0];
+  private shoreCache = new Map<string, ShoreIndex>();
+  private _shore!: ShoreIndex;
+  private _waterComps = new Set<number>();
 
   get game(): Game {
     if (!this._game) throw new Error("call reset() first");
@@ -139,6 +152,16 @@ export class OpenFrontEnv {
 
   get clientID(): string {
     return AGENT_CLIENT_ID;
+  }
+
+  /** Static shore-tile index for the current map (cached across resets). */
+  get shore(): ShoreIndex {
+    return this._shore;
+  }
+
+  /** Water components touching the agent's shoreline, as of the last step. */
+  get waterComps(): Set<number> {
+    return this._waterComps;
   }
 
   /** Neighbor slots as of the end of the last reset/step (top-K by size). */
@@ -257,6 +280,12 @@ export class OpenFrontEnv {
     if (!this.agent.hasSpawned()) throw new Error("agent failed to spawn");
 
     this.startTick = game.ticks();
+    let shore = this.shoreCache.get(cfg.map.toLowerCase());
+    if (!shore) {
+      shore = new ShoreIndex(game);
+      this.shoreCache.set(cfg.map.toLowerCase(), shore);
+    }
+    this._shore = shore;
     this.refreshNeighbors();
     this.prev = snapshot(game, this.agent);
     return this.info("running", false);
@@ -272,6 +301,8 @@ export class OpenFrontEnv {
       me,
       clientID: AGENT_CLIENT_ID,
       neighbors: this._neighbors,
+      shore: this._shore,
+      waterComps: this._waterComps,
     });
     for (let k = 0; k < this.interval; k++) {
       this.tick(k === 0 && intent !== null ? [intent] : []);
@@ -316,6 +347,7 @@ export class OpenFrontEnv {
   private refreshNeighbors(): void {
     const game = this.game;
     const me = this.agent;
+    this._waterComps = reachableWaterComponents(game, me);
     const map = game.map();
     const seen = new Set<Player>();
     for (const t of me.borderTiles()) {
@@ -342,6 +374,11 @@ export class OpenFrontEnv {
       tileShare: this.prev.tileShare,
       agentAlive: this.agent.isAlive(),
       playersAlive: game.players().filter((p) => p.isAlive()).length,
+      alliesCount: game
+        .players()
+        .filter((p) => p !== this.agent && p.isAlive() && this.agent.isAlliedWith(p))
+        .length,
+      traitor: this.agent.isTraitor(),
       hash: this.lastHash ? String(this.lastHash.hash) : null,
     };
   }

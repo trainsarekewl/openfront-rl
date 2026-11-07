@@ -85,7 +85,7 @@ async function main() {
     const r = await episode(env, map, bots, 100 + e, maxTicks);
     console.log(
       `ep ${e}: ${r.last.info.outcome} steps=${r.steps} reward=${r.total.toFixed(3)} ` +
-        `tileShare=${r.last.info.tileShare.toFixed(4)} reset=${r.resetMs.toFixed(0)}ms ` +
+        `tileShare=${r.last.info.tileShare.toFixed(4)} allies=${r.last.info.alliesCount} traitor=${r.last.info.traitor} reset=${r.resetMs.toFixed(0)}ms ` +
         `steps/s=${((r.steps / r.stepMs) * 1000).toFixed(1)} hash=${r.last.info.hash}`,
     );
     console.log(

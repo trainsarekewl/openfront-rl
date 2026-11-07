@@ -84,3 +84,20 @@ which is separate from the production map loader. Production maps (`resources/ma
 3. Accepting an alliance = sending `allianceRequest` to a player that already has a pending request to you (`AllianceRequestExecution.init` calls `incoming.accept()`). Confirmed.
 4. Tribes (bots) do attack the Human; a random policy is often eliminated. `Player.isAlive()` is false after elimination; `game.getWinner()` is non-null at game end (checked by `WinCheckExecution` every 10 ticks).
 5. Measured with bench.ts, alps map, 10 bots, interval 10: 1100-1300 ticks/s, i.e. r of about 110-130 decisions/s/core before real obs/mask cost.
+
+## Action validity (probed with `npm run probe`, Phase 2)
+- **Boat:** `canBuildTransportShip` needs (a) fewer than 3 transport ships, (b) the agent to own shore tiles
+  on a water component, (c) the target within 50 tiles of a shore tile of the target's owner on a reachable component, and
+  (d) the target player attackable. Inland spawns (alps, most seeds) can never use boats. Each `canBuild(TransportShip)` call costs
+  ~3 ms (it builds a `SpatialQuery` and runs BFS/A*), so a 1024-cell sweep took 3.3 s. Fix: `ShoreIndex` (static, cached per map) +
+  `reachableWaterComponents` pre-filter, then `canBuild` on at most 6 candidates only when an action is executed (sweep now ~0.2-0.3 s
+  for the whole grid, and mask.ts will use the pre-filter alone). On coastal maps ~20% of random boat actions are valid.
+- **Build:** valid tiles exist but gold gates it: start gold 60k vs City/Port/Factory 125k, Defense Post 50k, Warship 250k, SAM 1.5M,
+  Silo 1M. Gold reaches 300k by tick ~3200. `canBuild` sweeps over the grid are cheap (~10 ms). Mask: skip unaffordable types using
+  `me.buildableUnits(null)` cost, then per-cell `canBuild`.
+- **Alliance reject:** the engine warns and ignores a reject without a pending incoming request; `decodeAction` now requires one
+  (`me.incomingAllianceRequests()`). Tribes never send requests in the probes, so rejects are almost never valid.
+- **Alliance request: tribes accept instantly** (probed on aegean and world: every neighbor allied within 20 steps). The agent can ally
+  every bordering tribe at no cost. Need to decide before training: whether allies can both win, whether to disable alliances in the
+  game config (`disableAlliances`), or to keep it and let the reward handle it.
+- **Neighbors** are often empty in the first 800 ticks on big maps (alps/world with 10 bots); the neighbor-slot actions are then all invalid.

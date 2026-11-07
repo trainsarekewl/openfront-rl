@@ -5,6 +5,7 @@
   "scripts": {
     "link": "node scripts/link.mjs",
     "bench": "node ../openfront/node_modules/tsx/dist/cli.mjs src/bench.ts",
-    "smoke": "node ../openfront/node_modules/tsx/dist/cli.mjs src/smoke_env.ts"
+    "smoke": "node ../openfront/node_modules/tsx/dist/cli.mjs src/smoke_env.ts",
+    "probe": "node ../openfront/node_modules/tsx/dist/cli.mjs src/probe.ts"
   }
 }

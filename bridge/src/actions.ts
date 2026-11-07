@@ -49,12 +49,81 @@ export interface Action {
   param: number;
 }
 
+/**
+ * Static per-map index of shore land tiles by grid cell (a few evenly spaced
+ * samples each). Boat validity through the engine (`canBuild(TransportShip)`)
+ * costs about 3 ms per tile, so masks pre-filter with this index and only call
+ * the engine on a handful of candidates.
+ */
+export class ShoreIndex {
+  readonly cells: TileRef[][];
+  static readonly SAMPLES = 6;
+
+  constructor(game: Game) {
+    const map = game.map();
+    const w = game.width();
+    const h = game.height();
+    const all: TileRef[][] = Array.from({ length: GRID * GRID }, () => []);
+    for (let y = 0; y < h; y++) {
+      const cy = Math.min(GRID - 1, Math.floor((y * GRID) / h));
+      for (let x = 0; x < w; x++) {
+        const t = game.ref(x, y);
+        if (!map.isLand(t) || !map.isShore(t)) continue;
+        all[Math.min(GRID - 1, Math.floor((x * GRID) / w)) + cy * GRID].push(t);
+      }
+    }
+    this.cells = all.map((tiles) => {
+      if (tiles.length <= ShoreIndex.SAMPLES) return tiles;
+      const step = tiles.length / ShoreIndex.SAMPLES;
+      return Array.from(
+        { length: ShoreIndex.SAMPLES },
+        (_, i) => tiles[Math.floor(i * step)],
+      );
+    });
+  }
+}
+
+/** Water components touching the player's own shoreline. */
+export function reachableWaterComponents(game: Game, me: Player): Set<number> {
+  const map = game.map();
+  const out = new Set<number>();
+  for (const t of me.borderTiles()) {
+    if (!map.isShore(t)) continue;
+    const c = game.getWaterComponent(t);
+    if (c !== null) out.add(c);
+  }
+  return out;
+}
+
+/**
+ * Sample shore tiles of a cell that a transport ship could plausibly land on:
+ * not mine, on a water component my shoreline touches. A necessary condition
+ * only; `canBuild(TransportShip, t)` is the final check.
+ */
+export function boatCandidates(
+  game: Game,
+  me: Player,
+  shore: ShoreIndex,
+  comps: Set<number>,
+  cell: number,
+): TileRef[] {
+  if (comps.size === 0) return [];
+  return shore.cells[cell].filter((t) => {
+    if (game.owner(t) === me) return false;
+    const c = game.getWaterComponent(t);
+    return c !== null && comps.has(c);
+  });
+}
+
 export interface DecodeContext {
   game: Game;
   me: Player;
   clientID: string;
   /** Neighbor slots, in the same order the observation reported them. */
   neighbors: readonly Player[];
+  shore: ShoreIndex;
+  /** water components touching my shoreline (recompute per step) */
+  waterComps: Set<number>;
 }
 
 /** The tile nearest the center of grid cell (cx, cy) that satisfies pred. */
@@ -114,16 +183,14 @@ export function decodeAction(
     case ActionType.Boat: {
       const troops = troopsFor();
       if (troops <= 0) return null;
-      const map = game.map();
-      const dst = findTileInCell(
+      const dst = boatCandidates(
         game,
+        me,
+        ctx.shore,
+        ctx.waterComps,
         a.target,
-        (t) =>
-          map.isLand(t) &&
-          game.owner(t) !== me &&
-          me.canBuild(UnitType.TransportShip, t) !== false,
-      );
-      return dst === null ? null : { type: "boat", dst, troops, clientID };
+      ).find((t) => me.canBuild(UnitType.TransportShip, t) !== false);
+      return dst === undefined ? null : { type: "boat", dst, troops, clientID };
     }
     case ActionType.Build: {
       const unit = BUILD_TYPES[a.param % BUILD_TYPES.length];
@@ -145,9 +212,11 @@ export function decodeAction(
     }
     case ActionType.AllianceReject: {
       const t = slot();
-      return t === null
-        ? null
-        : { type: "allianceReject", requestor: t.id(), clientID };
+      // The engine warns (and does nothing) without a pending request.
+      return t !== null &&
+        me.incomingAllianceRequests().some((r) => r.requestor() === t)
+        ? { type: "allianceReject", requestor: t.id(), clientID }
+        : null;
     }
     case ActionType.BreakAlliance: {
       const t = slot();
