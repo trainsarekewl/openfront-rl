@@ -1,0 +1,113 @@
+{
+  "args": {
+    "procs": [
+      1,
+      2,
+      4,
+      6,
+      8,
+      12
+    ],
+    "map": "alps",
+    "bots": 10,
+    "interval": 10,
+    "max_ticks": 3000,
+    "policy": "random",
+    "out": "scripts/bench_parallel_alps10.json"
+  },
+  "rows": [
+    {
+      "procs": 1,
+      "agg_r": 49.1,
+      "r_per_proc": 49.1,
+      "agg_ticks_s": 491.0,
+      "efficiency": 1.0,
+      "batch_s": 12.827749252319336,
+      "ends": [
+        "max-ticks"
+      ]
+    },
+    {
+      "procs": 2,
+      "agg_r": 91.6,
+      "r_per_proc": 45.8,
+      "agg_ticks_s": 916.0,
+      "efficiency": 0.9327902240325865,
+      "batch_s": 13.506994009017944,
+      "ends": [
+        "max-ticks",
+        "max-ticks"
+      ]
+    },
+    {
+      "procs": 4,
+      "agg_r": 152.8,
+      "r_per_proc": 38.2,
+      "agg_ticks_s": 1528.0,
+      "efficiency": 0.7780040733197556,
+      "batch_s": 15.33234715461731,
+      "ends": [
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks"
+      ]
+    },
+    {
+      "procs": 6,
+      "agg_r": 216.3,
+      "r_per_proc": 36.050000000000004,
+      "agg_ticks_s": 2163.0,
+      "efficiency": 0.7342158859470468,
+      "batch_s": 17.367866039276123,
+      "ends": [
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks"
+      ]
+    },
+    {
+      "procs": 8,
+      "agg_r": 272.8,
+      "r_per_proc": 34.1,
+      "agg_ticks_s": 2728.0,
+      "efficiency": 0.6945010183299389,
+      "batch_s": 20.274919986724854,
+      "ends": [
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks"
+      ]
+    },
+    {
+      "procs": 12,
+      "agg_r": 333.7,
+      "r_per_proc": 27.808333333333334,
+      "agg_ticks_s": 3337.0,
+      "efficiency": 0.5663611676849966,
+      "batch_s": 28.994662761688232,
+      "ends": [
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks",
+        "max-ticks"
+      ]
+    }
+  ]
+}
