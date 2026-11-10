@@ -47,6 +47,8 @@ import {
   reachableWaterComponents,
   ShoreIndex,
 } from "./actions";
+import { ActionMask, buildMask, emptyMask } from "./mask";
+import { Observation, ObsBuilder, ObsStatic } from "./obs";
 import {
   DEFAULT_REWARD,
   RewardCoefs,
@@ -77,6 +79,8 @@ export interface ResetConfig {
   /** truncate the episode after this many game ticks (excluding spawn phase) */
   maxTicks?: number;
   reward?: Partial<RewardCoefs>;
+  /** Allow alliances (default false: tribes accept every request instantly). */
+  alliances?: boolean;
 }
 
 export interface StepResult {
@@ -138,6 +142,10 @@ export class OpenFrontEnv {
   private _neighbors: Player[] = [];
   private scratch: TileRef[] = [0, 0, 0, 0];
   private shoreCache = new Map<string, ShoreIndex>();
+  private obsStaticCache = new Map<string, ObsStatic>();
+  private obsStatic!: ObsStatic;
+  private obsBuilder = new ObsBuilder();
+  private maskBuf: ActionMask = emptyMask();
   private _shore!: ShoreIndex;
   private _waterComps = new Set<number>();
 
@@ -152,6 +160,38 @@ export class OpenFrontEnv {
 
   get clientID(): string {
     return AGENT_CLIENT_ID;
+  }
+
+  /**
+   * Current observation. The arrays are reused by the next call: copy or
+   * serialize them first.
+   */
+  observe(): Observation {
+    return this.obsBuilder.build(
+      this.game,
+      this.agent,
+      this._neighbors,
+      this.obsStatic,
+      { elapsedTicks: this.game.ticks() - this.startTick, maxTicks: this.maxTicks },
+    );
+  }
+
+  /**
+   * Action mask for the current state. Arrays are reused by the next call.
+   * Pass exactBuildCells=false to skip the per-cell canBuild sweep.
+   */
+  mask(exactBuildCells = true): ActionMask {
+    return buildMask(
+      {
+        game: this.game,
+        me: this.agent,
+        neighbors: this._neighbors,
+        shore: this._shore,
+        waterComps: this._waterComps,
+        exactBuildCells,
+      },
+      this.maskBuf,
+    );
   }
 
   /** Static shore-tile index for the current map (cached across resets). */
@@ -194,6 +234,7 @@ export class OpenFrontEnv {
       infiniteTroops: false,
       instantBuild: false,
       randomSpawn: false,
+      disableAlliances: cfg.alliances ? null : true,
     };
     const gameStart: GameStartInfo = {
       gameID: (cfg.seed >>> 0).toString(36).padStart(8, "0"),
@@ -286,6 +327,12 @@ export class OpenFrontEnv {
       this.shoreCache.set(cfg.map.toLowerCase(), shore);
     }
     this._shore = shore;
+    let os = this.obsStaticCache.get(cfg.map.toLowerCase());
+    if (!os) {
+      os = new ObsStatic(game);
+      this.obsStaticCache.set(cfg.map.toLowerCase(), os);
+    }
+    this.obsStatic = os;
     this.refreshNeighbors();
     this.prev = snapshot(game, this.agent);
     return this.info("running", false);

@@ -6,6 +6,10 @@
     "link": "node scripts/link.mjs",
     "bench": "node ../openfront/node_modules/tsx/dist/cli.mjs src/bench.ts",
     "smoke": "node ../openfront/node_modules/tsx/dist/cli.mjs src/smoke_env.ts",
-    "probe": "node ../openfront/node_modules/tsx/dist/cli.mjs src/probe.ts"
+    "probe": "node ../openfront/node_modules/tsx/dist/cli.mjs src/probe.ts",
+    "obs": "node ../openfront/node_modules/tsx/dist/cli.mjs src/obs_check.ts",
+    "mask": "node ../openfront/node_modules/tsx/dist/cli.mjs src/mask_check.ts",
+    "main": "node ../openfront/node_modules/tsx/dist/cli.mjs src/main.ts",
+    "main-check": "node ../openfront/node_modules/tsx/dist/cli.mjs src/main_check.ts"
   }
 }
